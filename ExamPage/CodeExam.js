@@ -1,21 +1,22 @@
 import * as React from 'react';
-import { useContext, Component} from 'react'
-import {View, StyleSheet, Text, Button, TouchableOpacity, TouchableHighlight} from 'react-native';
-import {FilledButton} from '../components/FilledButton';
+import { useContext, Component } from 'react'
+import { View, StyleSheet, Text, Button, TouchableOpacity, TouchableHighlight } from 'react-native';
+import { FilledButton } from '../components/FilledButton';
 import { AuthContext } from '../navigaiton/AuthProvider';
 import firestore from '@react-native-firebase/firestore';
 import { Input, ListItem } from 'react-native-elements';
 import { ScrollView } from 'react-native-gesture-handler';
+import { TextInput } from 'react-native';
 
-import {RadioGroup, RadioButton} from 'react-native-flexi-radio-button'
+import { RadioGroup, RadioButton } from 'react-native-flexi-radio-button'
 
 let arrayDictStudents = [];
 let score = [];
 let outPutScore = 0;
 let tempQuestion = [];
+let arraySub = [];
 
-
-function FinishTest(){
+function FinishTest() {
   score = score.filter(function (item) {
     return item == 'Correct';
   });
@@ -27,12 +28,12 @@ function FinishTest(){
 }
 
 
-function ScoreSystem(eachStudent, awnser){
-  
-  if (!(tempQuestion.includes(eachStudent["question"]))){
+function ScoreSystem(eachStudent, awnser) {
+
+  if (!(tempQuestion.includes(eachStudent["question"]))) {
     tempQuestion.push(eachStudent["question"]);
     score.push("None");
- 
+
     if (awnser == eachStudent["ans"]) {
       score.splice(tempQuestion.indexOf(eachStudent["question"]), 1, 'Correct');
     } else {
@@ -45,8 +46,8 @@ function ScoreSystem(eachStudent, awnser){
       score.splice(tempQuestion.indexOf(eachStudent["question"]), 1, 'Uncorrect');
     }
   }
-  console.log(score);
-} 
+  //console.log(score);
+}
 
 class StudentTakeTest extends React.Component {
   static contextType = AuthContext;
@@ -54,16 +55,68 @@ class StudentTakeTest extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      students : arrayDictStudents,
+      students: arrayDictStudents,
       userArr: [],
-
+      subStudent: arraySub,
+      ans: "",
+      textInput: [],
+      inputData: []
     }
     this.onPressButton = this.onPressButton.bind(this);
   }
+  addTextInput = (index) => {
+    let textInput = this.state.textInput;
+    textInput.push(<TextInput style={styles.textInput}
+      onChangeText={(text) => this.addValues(text, index)} />);
+    this.setState({ textInput });
+  }
+  removeTextInput = () => {
+    let textInput = this.state.textInput;
+    let inputData = this.state.inputData;
+    textInput.pop();
+    inputData.pop();
+    this.setState({ textInput, inputData });
+  }
+  addValues = (text, index) => {
+    let dataArray = this.state.inputData;
+    let checkBool = false;
+    if (dataArray.length !== 0) {
+      dataArray.forEach(element => {
+        if (element.index === index) {
+          element.text = text;
+          checkBool = true;
+        }
+      });
+    }
+    if (checkBool) {
+      this.setState({
+        inputData: dataArray
+      });
+    }
+    else {
+      dataArray.push({ 'text': text, 'index': index });
+      this.setState({
+        inputData: dataArray
+      });
+    }
+  }
 
-  onSelect(index, value, eachStudent){
+  //function to console the output
+  getValues = () => {
+    console.log('Data', this.state.inputData);
+  }
+
+
+  inputValueUpdate = (val, prop) => {
+    const state = this.state;
+    state[prop] = val;
+    this.setState(state);
+  }
+
+  onSelect(index, value, eachStudent) {
     this.setState({
-    text: `Selected index: ${index} , value: ${value}`})
+      text: `Selected index: ${index} , value: ${value}`
+    })
     ScoreSystem(eachStudent, value)
   }
 
@@ -71,14 +124,15 @@ class StudentTakeTest extends React.Component {
     this.unsubscribe = this.fireStoreData.onSnapshot(this.getCollection);
   }
 
-  componentWillUnmount(){
+  componentWillUnmount() {
     this.unsubscribe();
   }
 
   getCollection = (querySnapshot) => {
+    console.log(querySnapshot.length);
     const userArr = [];
     querySnapshot.forEach((res) => {
-      const {ans, choice1, choice2, choice3, choice4, question} = res.data();
+      const { ans, choice1, choice2, choice3, choice4, question, check } = res.data();
       const { chat, name } = res.data();
       userArr.push({
         key: res.id,
@@ -91,6 +145,7 @@ class StudentTakeTest extends React.Component {
         question,
         chat,
         name,
+        check
       })
     })
     this.setState({
@@ -98,104 +153,130 @@ class StudentTakeTest extends React.Component {
     })
   }
 
-  storeUser() { 
+  storeUser() {
     this.usersCollectionRef.add({
-            chat: this.state.chat,
-            name: this.context.user.email,
-            score: outPutScore,
-            timestamp: firestore.FieldValue.serverTimestamp()
-          }).then((res) => {
-              this.setState({
-                chat: '',
-                name: ''
-              })
-          })
-          .catch((err) => {
-              console.log('Error found: ', err);
-              this.setState({
-                  isLoading: false
-              })
-          })
-      }
-
-  render() {
-    if (arrayDictStudents.length != 0){
-      arrayDictStudents = [];
-    }
-    const {text} = this.props.route.params
-    console.log({text}.text)
-    this.fireStoreData = firestore().collection("subject_Code").doc({text}.text).collection('Exam');
-    this.usersCollectionRef = firestore().collection("subject_Code").doc({text}.text).collection('score');
-
-    {
-      this.state.userArr.map((item, i) => {
-        arrayDictStudents.push({
-              ans: item.ans,
-              choice1: item.choice1,
-              choice2: item.choice2,
-              choice3: item.choice3,
-              choice4: item.choice4,
-              question: item.question
-            }
-            )
-
+      chat: this.state.chat,
+      name: this.context.user.email,
+      score: outPutScore,
+      timestamp: firestore.FieldValue.serverTimestamp(),
+      ans: this.state.ans
+    }).then((res) => {
+      this.setState({
+        chat: '',
+        name: '',
+        ans: ''
       })
-      // console.log(arrayDictStudents);
-    }
-
-    return (
-      <ScrollView>
-      <View style={styles.container}>
-        {this.state.students.map(eachStudent => (
-            <>
+    })
+      .catch((err) => {
+        console.log('Error found: ', err);
+        this.setState({
+          isLoading: false
+        })
+      })
+  }
+  renderElement(eachStudent) {
+    if (eachStudent.choice1 == "")
+      return (
+        <View>
           <Text style={styles.text_head}>
-            {console.log(eachStudent)                   /*console log this*/} 
+            {/*console.log(eachStudent)*/}
             {eachStudent.question}
-          </Text> 
-
-          <RadioGroup 
-          size={40}
-          thickness={4}
-          color='#00CABA'
-          highlightColor='#97FFDA'
-          onSelect = {(index, value) => this.onSelect(index, value, eachStudent)}
+          </Text>
+          <Input
+            placeholder="Question"
+            leftIcon={{ type: 'font-awesome', name: 'book' }}
+            style={styles}
+            value={this.state.ans}
+            onChangeText={(val) => this.inputValueUpdate(val, 'ans')}
+            />
+        </View>
+      )
+  }
+  renderElement2(eachStudent) {
+    if (eachStudent.choice1 != "")
+      return (
+        <View>
+          <Text style={styles.text_head}>
+            {console.log(eachStudent.length)}
+            {eachStudent.question}
+          </Text>
+          <RadioGroup
+            size={40}
+            thickness={4}
+            color='#00CABA'
+            highlightColor='#97FFDA'
+            onSelect={(index, value) => this.onSelect(index, value, eachStudent)}
           >
-
-              <RadioButton value={1}>
-                  <Text style={styles.text_choice}>{eachStudent.choice1}</Text>
-              </RadioButton>
-              <RadioButton value={2}>
-                  <Text style={styles.text_choice}>{eachStudent.choice2}</Text>
-              </RadioButton>
-              <RadioButton value={3}>
-                  <Text style={styles.text_choice}>{eachStudent.choice3}</Text>
-              </RadioButton>
-              <RadioButton value={4}>
-                  <Text style={styles.text_choice}>{eachStudent.choice4}</Text>
-              </RadioButton>
+            <RadioButton value={1}>
+              <Text style={styles.text_choice}>{eachStudent.choice1}</Text>
+            </RadioButton>
+            <RadioButton value={2}>
+              <Text style={styles.text_choice}>{eachStudent.choice2}</Text>
+            </RadioButton>
+            <RadioButton value={3}>
+              <Text style={styles.text_choice}>{eachStudent.choice3}</Text>
+            </RadioButton>
+            <RadioButton value={4}>
+              <Text style={styles.text_choice}>{eachStudent.choice4}</Text>
+            </RadioButton>
           </RadioGroup>
-
           <Text>
             {"\n"}
           </Text>
+        </View>
+      )
+  }
 
-          </>
-          
-        ))}
-      
-      <TouchableOpacity style={styles.button_sub} onPress={this.onPressButton} >
+  render() {
+    if (arrayDictStudents.length != 0) {
+      arrayDictStudents = [];
+    }
+    const { text } = this.props.route.params
+    this.fireStoreData = firestore().collection("subject_Code").doc({ text }.text).collection('Exam');
+    this.usersCollectionRef = firestore().collection("subject_Code").doc({ text }.text).collection('score');
+    {
+      this.state.userArr.map((item, i) => {
+        arrayDictStudents.push({
+          ans: item.ans,
+          choice1: item.choice1,
+          choice2: item.choice2,
+          choice3: item.choice3,
+          choice4: item.choice4,
+          question: item.question
+        })
+        console.log(arraySub);
+      })
+    }
+    return (
+      <ScrollView>
+
+        <View style={styles.container}>
+
+          {this.state.students.map(eachStudent => {
+            if (eachStudent.choice1 == "") {
+              return (
+                this.renderElement(eachStudent)
+              );
+            } else {
+              return (
+                this.renderElement2(eachStudent)
+              )
+            }
+          })}
+          <Text>
+            {"\n"}
+          </Text>
+          <TouchableOpacity style={styles.button_sub} onPress={this.onPressButton} >
             <Text style={styles.text_sub}>
               Summit
             </Text>
-      </TouchableOpacity>
-
-      </View>
-      
-    </ScrollView>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     );
   }
   onPressButton() {
-    const {navigate} = this.props.navigation;
+    const { navigate } = this.props.navigation;
     FinishTest();
     this.storeUser();
     navigate('Home Student');
@@ -216,7 +297,7 @@ const styles = StyleSheet.create({
     marginVertical: 32,
   },
 
-  text:{
+  text: {
     fontWeight: 'bold',
     padding: 20,
     fontSize: 25,
@@ -225,35 +306,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#E2FCFA',
     justifyContent: 'center',
-    paddingBottom:200,
+    paddingBottom: 200,
 
   },
 
   button_sub: {
-    
+
     alignItems: "center",
     backgroundColor: "#0E6655",
     padding: 20,
   },
-  text_head:{
+  text_head: {
     fontWeight: 'bold',
     padding: 20,
     fontSize: 25,
     textAlign: 'center',
     backgroundColor: '#00CABA',
-    
+
   },
-  text_choice:{
+  text_choice: {
     fontSize: 20,
     paddingHorizontal: 20,
   },
-  text_sub:{
+  text_sub: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#FFF',
 
   }
-  });
+});
 
 
-  export default StudentTakeTest;
+export default StudentTakeTest;
